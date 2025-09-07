@@ -39,7 +39,7 @@ form{ display: block; }
 .field{ display: grid; gap: 6px; margin-bottom: 12px; }
 label{ font-weight: 600; }
 input[type="text"], select{
-  width: 100%;
+  width: auto;
   background: #cdc9c9;
   color: #050505;
   border: 1px solid #151821;
