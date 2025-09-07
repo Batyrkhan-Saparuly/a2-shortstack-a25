@@ -8,10 +8,14 @@ const http = require( "http" ),
       dir  = "public/",
       port = 3000
 
-const appdata = [
-  { "model": "toyota", "year": 1999, "mpg": 23 },
-  { "model": "honda", "year": 2004, "mpg": 30 },
-  { "model": "ford", "year": 1987, "mpg": 14} 
+const todos = [
+  {
+    id: "1",
+    task: "Set up meetings",
+    priority: "medium",
+    createdAt: "2025-09-07T12:00:00.000Z",
+    dueDate: "2025-09-10T12:00:00.000Z" // (Derived field, it will be computed on the server for new items)
+  }
 ]
 
 const server = http.createServer( function( request,response ) {
@@ -25,6 +29,11 @@ const server = http.createServer( function( request,response ) {
 const handleGet = function( request, response ) {
   const filename = dir + request.url.slice( 1 ) 
 
+  if (request.url === "/todos") {
+    response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" })
+    response.end(JSON.stringify(todos))   
+    return
+  }
   if( request.url === "/" ) {
     sendFile( response, "public/index.html" )
   }else{
@@ -32,22 +41,117 @@ const handleGet = function( request, response ) {
   }
 }
 
-const handlePost = function( request, response ) {
-  let dataString = ""
+const handlePost = function (request, response) {
+  let dataString = "";
 
   request.on( "data", function( data ) {
       dataString += data 
   })
 
-  request.on( "end", function() {
-    console.log( JSON.parse( dataString ) )
+  request.on("end", () => {
+    
+    let bodyObj = {};
+    try {
+      bodyObj = JSON.parse(dataString || "{}");
+    } catch {
+      response.writeHeader(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "Invalid JSON" }));
+      return;
+    }
 
-    // ... do something with the data here!!!
+    // route: create a todo
+    if (request.url === "/todos") {
+      const task = String(bodyObj.task ?? "").trim();
+      const priority = String(bodyObj.priority ?? "low").toLowerCase();
 
-    response.writeHead( 200, "OK", {"Content-Type": "text/plain" })
-    response.end("test")
-  })
+      const id = Math.random().toString(36).slice(2);
+      const createdAt = new Date().toISOString();
+
+      // derived field: dueDate from priority + createdAt
+      const created = new Date(createdAt);
+      const days = priority === "high" ? 1 : (priority === "medium" ? 3 : 7);
+      created.setDate(created.getDate() + days);
+      const dueDate = created.toISOString();
+
+      todos.push({ id, task, priority, createdAt, dueDate }); 
+
+      response.writeHeader(201, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify(todos));
+      return;
+    }
+
+    // unknown POST route
+    response.writeHeader(404, { "Content-Type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ error: "Not found" }));
+  });
+
+  request.on("error", () => {
+    response.writeHeader(400, { "Content-Type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ error: "Request error" }));
+  });
+
+  if (request.url === "/todos/update") {
+  const id = String(bodyObj.id ?? "");
+  if (!id) {
+    response.writeHeader(400, { "Content-Type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ error: "Missing id" }));
+    return;
+  }
+
+  const item = todos.find(t => t.id === id); 
+  if (!item) {
+    response.writeHeader(404, { "Content-Type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ error: "Not found" }));
+    return;
+  }
+
+  // Apply provided changes only
+  if (typeof bodyObj.task === "string") {
+    item.task = bodyObj.task.trim();
+  }
+
+  if (typeof bodyObj.priority === "string") {
+    const p = bodyObj.priority.toLowerCase();
+    if (["low", "medium", "high"].includes(p)) {
+      item.priority = p;
+    } else {
+      response.writeHeader(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "Invalid priority. Use low|medium|high." }));
+      return;
+    }
+  }
+
+  // Recompute DERIVED field from (possibly updated) priority + original createdAt
+  const created = new Date(item.createdAt);
+  const days = item.priority === "high" ? 1 : (item.priority === "medium" ? 3 : 7);
+  created.setDate(created.getDate() + days);
+  item.dueDate = created.toISOString();
+
+  // Return updated dataset
+  response.writeHeader(200, { "Content-Type": "application/json; charset=utf-8" });
+  response.end(JSON.stringify(todos)); 
+  return;
 }
+
+else if (request.url === "/todos/delete") {
+  const id = String(bodyObj.id ?? "");
+  if (!id) {
+    response.writeHeader(400, { "Content-Type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ error: "Missing id" }));
+    return;
+  }
+
+  const idx = todos.findIndex(t => t.id === id); 
+  if (idx !== -1) {
+    todos.splice(idx, 1); // remove the item
+  }
+  // Always return the current dataset 
+  response.writeHeader(200, { "Content-Type": "application/json; charset=utf-8" });
+  response.end(JSON.stringify(todos)); 
+  return;
+}
+
+};
 
 const sendFile = function( response, filename ) {
    const type = mime.getType( filename ) 
