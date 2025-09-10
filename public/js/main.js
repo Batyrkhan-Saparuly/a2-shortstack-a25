@@ -55,7 +55,7 @@ form.addEventListener("submit", (e) => {
   const task = taskInput.value.trim();
   const priority = priorityInput.value;
 
-  if (!task) { setStatus("Task is required.", "error"); taskInput.focus(); return; }
+  if (!task) { taskInput.focus(); return; }
   if (!["low","medium","high"].includes(priority)) { return; }
 
   submitBtn.disabled = true;
@@ -109,10 +109,13 @@ tbody.addEventListener("click", (e) => {
 
     if (editIdInput) editIdInput.value = id;
     taskInput.value = task;
+    if (priorityInput) priorityInput.value = priority;
 
     submitBtn.textContent = "Save";
     taskInput.focus();
   }
 });
+
+
 
 

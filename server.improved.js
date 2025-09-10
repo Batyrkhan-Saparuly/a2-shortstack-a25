@@ -49,7 +49,7 @@ const handlePost = function (request, response) {
   })
 
   request.on("end", () => {
-    
+  
     let bodyObj = {};
     try {
       bodyObj = JSON.parse(dataString || "{}");
@@ -59,7 +59,7 @@ const handlePost = function (request, response) {
       return;
     }
 
-    // route: create a todo
+    // Create
     if (request.url === "/todos") {
       const task = String(bodyObj.task ?? "").trim();
       const priority = String(bodyObj.priority ?? "low").toLowerCase();
@@ -67,15 +67,71 @@ const handlePost = function (request, response) {
       const id = Math.random().toString(36).slice(2);
       const createdAt = new Date().toISOString();
 
-      // derived field: dueDate from priority + createdAt
+      // derived: dueDate from priority + createdAt
       const created = new Date(createdAt);
       const days = priority === "high" ? 1 : (priority === "medium" ? 3 : 7);
       created.setDate(created.getDate() + days);
       const dueDate = created.toISOString();
 
-      todos.push({ id, task, priority, createdAt, dueDate }); 
+      todos.push({ id, task, priority, createdAt, dueDate });
 
       response.writeHeader(201, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify(todos));
+      return;
+    }
+
+    // update
+    if (request.url === "/todos/update") {
+      const id = String(bodyObj.id ?? "");
+      if (!id) {
+        response.writeHeader(400, { "Content-Type": "application/json; charset=utf-8" });
+        response.end(JSON.stringify({ error: "Missing id" }));
+        return;
+      }
+
+      const item = todos.find(t => t.id === id);
+      if (!item) {
+        response.writeHeader(404, { "Content-Type": "application/json; charset=utf-8" });
+        response.end(JSON.stringify({ error: "Not found" }));
+        return;
+      }
+
+      if (typeof bodyObj.task === "string") item.task = bodyObj.task.trim();
+
+      if (typeof bodyObj.priority === "string") {
+        const p = bodyObj.priority.toLowerCase();
+        if (!["low","medium","high"].includes(p)) {
+          response.writeHeader(400, { "Content-Type": "application/json; charset=utf-8" });
+          response.end(JSON.stringify({ error: "Invalid priority" }));
+          return;
+        }
+        item.priority = p;
+      }
+
+      // recompute derived field from item.priority + original createdAt
+      const created = new Date(item.createdAt);
+      const days = item.priority === "high" ? 1 : (item.priority === "medium" ? 3 : 7);
+      created.setDate(created.getDate() + days);
+      item.dueDate = created.toISOString();
+
+      response.writeHeader(200, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify(todos));
+      return;
+    }
+
+    // delete
+    if (request.url === "/todos/delete") {
+      const id = String(bodyObj.id ?? "");
+      if (!id) {
+        response.writeHeader(400, { "Content-Type": "application/json; charset=utf-8" });
+        response.end(JSON.stringify({ error: "Missing id" }));
+        return;
+      }
+
+      const idx = todos.findIndex(t => t.id === id);
+      if (idx !== -1) todos.splice(idx, 1);
+
+      response.writeHeader(200, { "Content-Type": "application/json; charset=utf-8" });
       response.end(JSON.stringify(todos));
       return;
     }
@@ -89,68 +145,6 @@ const handlePost = function (request, response) {
     response.writeHeader(400, { "Content-Type": "application/json; charset=utf-8" });
     response.end(JSON.stringify({ error: "Request error" }));
   });
-
-  if (request.url === "/todos/update") {
-  const id = String(bodyObj.id ?? "");
-  if (!id) {
-    response.writeHeader(400, { "Content-Type": "application/json; charset=utf-8" });
-    response.end(JSON.stringify({ error: "Missing id" }));
-    return;
-  }
-
-  const item = todos.find(t => t.id === id); 
-  if (!item) {
-    response.writeHeader(404, { "Content-Type": "application/json; charset=utf-8" });
-    response.end(JSON.stringify({ error: "Not found" }));
-    return;
-  }
-
-  // Apply provided changes only
-  if (typeof bodyObj.task === "string") {
-    item.task = bodyObj.task.trim();
-  }
-
-  if (typeof bodyObj.priority === "string") {
-    const p = bodyObj.priority.toLowerCase();
-    if (["low", "medium", "high"].includes(p)) {
-      item.priority = p;
-    } else {
-      response.writeHeader(400, { "Content-Type": "application/json; charset=utf-8" });
-      response.end(JSON.stringify({ error: "Invalid priority. Use low|medium|high." }));
-      return;
-    }
-  }
-
-  // Recompute DERIVED field from (possibly updated) priority + original createdAt
-  const created = new Date(item.createdAt);
-  const days = item.priority === "high" ? 1 : (item.priority === "medium" ? 3 : 7);
-  created.setDate(created.getDate() + days);
-  item.dueDate = created.toISOString();
-
-  // Return updated dataset
-  response.writeHeader(200, { "Content-Type": "application/json; charset=utf-8" });
-  response.end(JSON.stringify(todos)); 
-  return;
-}
-
-else if (request.url === "/todos/delete") {
-  const id = String(bodyObj.id ?? "");
-  if (!id) {
-    response.writeHeader(400, { "Content-Type": "application/json; charset=utf-8" });
-    response.end(JSON.stringify({ error: "Missing id" }));
-    return;
-  }
-
-  const idx = todos.findIndex(t => t.id === id); 
-  if (idx !== -1) {
-    todos.splice(idx, 1); // remove the item
-  }
-  // Always return the current dataset 
-  response.writeHeader(200, { "Content-Type": "application/json; charset=utf-8" });
-  response.end(JSON.stringify(todos)); 
-  return;
-}
-
 };
 
 const sendFile = function( response, filename ) {
