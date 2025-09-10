@@ -44,7 +44,7 @@ window.addEventListener("DOMContentLoaded", () => {
   fetch("/todos")
     .then(r => r.json())
     .then(render)
-    .catch(err => setStatus(err.message || "Failed to load", "error"));
+    .catch(err => console.error("Failed to load", err))
 });
 
 // Form submit: create or update 
@@ -56,10 +56,9 @@ form.addEventListener("submit", (e) => {
   const priority = priorityInput.value;
 
   if (!task) { setStatus("Task is required.", "error"); taskInput.focus(); return; }
-  if (!["low","medium","high"].includes(priority)) { setStatus("Choose a priority.", "error"); return; }
+  if (!["low","medium","high"].includes(priority)) { return; }
 
   submitBtn.disabled = true;
-  setStatus(id ? "Saving…" : "Adding…");
 
   const url = id ? "/todos/update" : "/todos";
   const body = id ? { id, task, priority } : { task, priority };
@@ -75,10 +74,9 @@ form.addEventListener("submit", (e) => {
     form.reset();
     if (editIdInput) editIdInput.value = "";
     submitBtn.textContent = "Add";
-    setStatus(id ? "Saved!" : "Added!", "ok");
     render(todos); 
   })
-  .catch(err => setStatus(err.message || "Request failed", "error"))
+  .catch(err => console.error("Request failed:", err))
   .finally(() => { submitBtn.disabled = false; });
 });
 
@@ -96,8 +94,8 @@ tbody.addEventListener("click", (e) => {
       body: JSON.stringify({ id })
     })
     .then(r => r.json())
-    .then((todos) => { setStatus("Deleted.", "ok"); render(todos); })
-    .catch(err => setStatus(err.message || "Delete failed", "error"))
+    .then((todos) => { render(todos); })
+    .catch(err => console.error("Delete failed", err))
     .finally(() => { delBtn.disabled = false; });
 
     return;
