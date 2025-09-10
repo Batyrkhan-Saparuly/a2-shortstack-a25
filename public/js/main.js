@@ -82,5 +82,39 @@ form.addEventListener("submit", (e) => {
   .finally(() => { submitBtn.disabled = false; });
 });
 
+// Table actions (event delegation): Delete + Edit 
+tbody.addEventListener("click", (e) => {
+  const delBtn = e.target.closest(".delete-btn");
+  if (delBtn) {
+    const id = delBtn.dataset.id;
+    if (!id) return;
+
+    delBtn.disabled = true;
+    fetch("/todos/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id })
+    })
+    .then(r => r.json())
+    .then((todos) => { setStatus("Deleted.", "ok"); render(todos); })
+    .catch(err => setStatus(err.message || "Delete failed", "error"))
+    .finally(() => { delBtn.disabled = false; });
+
+    return;
+  }
+
+  const editBtn = e.target.closest(".edit-btn");
+  if (editBtn) {
+    const id = editBtn.dataset.id || "";
+    const task = editBtn.dataset.task || "";
+    const priority = editBtn.dataset.priority || "";
+
+    if (editIdInput) editIdInput.value = id;
+    taskInput.value = task;
+
+    submitBtn.textContent = "Save";
+    taskInput.focus();
+  }
+});
 
 
